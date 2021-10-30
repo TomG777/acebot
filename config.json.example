@@ -5,5 +5,22 @@
   "admin.ids": [],
   "admin.roles": [],
   "master.ids": [],
-  "master.roles": []
+  "master.roles": [],
+  "engine": "/opt/acestream/acestreamengine",
+  "portstart": 8880,
+  "hostip": null,
+  "publishdir": "/var/www/html/stream",
+  "cachedir": "cache",
+  "bitrate": 600000,
+  "maxslots": 100,
+  "maxpeers": 100,
+  "category": "sport",
+  "trackers": [
+    "udp://tracker.coppersurfer.tk:6969",
+    "udp://tracker.leechers-paradise.org:6969",
+    "udp://9.rarbg.me:2710/announce"
+  ],
+  "remoteaccess": false,
+  "remotetoken": false,
+  "permanent": true
 }
