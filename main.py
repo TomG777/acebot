@@ -50,9 +50,9 @@ async def on_message(message):
     for argument, command in commands.items():
         if argument != call:
             continue
-        if command["mod"] and not utils.check_mod(user):
+        if command["mod"] and not utils.check_mod(message.author):
             continue
-        if command["admin"] and not utils.check_admin(user):
+        if command["admin"] and not utils.check_admin(message.author):
             continue
         if command["master"] and not utils.check_master(message.author):
             continue
@@ -70,6 +70,12 @@ async def command_help(message, arguments):
     end = "```"
     result = ""
     for command, details in commands.items():
+        if details["mod"] and not utils.check_mod(message.author):
+            continue
+        if details["admin"] and not utils.check_admin(message.author):
+            continue
+        if details["master"] and not utils.check_master(message.author):
+            continue
         result += command
         if details["help"]:
             result += ": " + details["help"] + "\n"
@@ -80,7 +86,17 @@ async def command_help(message, arguments):
 
 @cmd("commands", "Get a list of commands")
 async def command_commands(message, arguments):
-    return "`" + "`, `".join(commands.keys()) + "`"
+    cmds = []
+    for argument, command in commands.items():
+        if details["mod"] and not utils.check_mod(message.author):
+            continue
+        if details["admin"] and not utils.check_admin(message.author):
+            continue
+        if details["master"] and not utils.check_master(message.author):
+            continue
+        cmds.append(argument)
+
+    return "`" + "`, `".join(cmds) + "`"
 
 
 client.run(open("token").read().strip())
