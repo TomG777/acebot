@@ -4,6 +4,7 @@ import discord
 import asyncio
 import utils
 import requests
+import stream
 
 client = discord.Client()
 config = utils.load_config()
@@ -12,6 +13,7 @@ prefix_length = len(prefix)
 commands = {}
 
 engines = []
+streams: list[stream.Stream] = []
 
 
 def cmd(name, help="", mod=False, admin=False, master=False):
@@ -64,7 +66,7 @@ async def on_message(message):
         result = await command["fn"](message, arguments)
         if result is not None:
             if type(result) is str:
-                await message.channel.send(result)
+                await message.channel.send(result[:1999])
             elif type(result) is discord.Embed:
                 await message.channel.send(embed=result)
 
@@ -89,88 +91,6 @@ async def command_help(message, arguments):
     return start + result + end
 
 
-@cmd("start", "Start a stream", master=True)
-async def command_run(message, arguments):
-    title, url = arguments.split(None, 1)
-    words = utils.get_words(arguments)
-    if len(words) < 2:
-        return "Missing arguments: <title> <url> [number] [bitrate]"
-
-    command = utils.build_command(*words[:4])
-    print(command)
-    proc = await asyncio.create_subprocess_shell(
-        command,
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE)
-    proc.stdin.write(b'Hello\n')
-    data = await proc.stdout.readline()
-    print(data.decode().strip())
-    data = {
-        "proc": proc,
-        "title": words[0],
-        "url": words[1],
-    }
-    if len(words) >= 3:
-        data["number"] = words[2]
-    else:
-        data["number"] = 1
-    engines.append(data)
-    return len(engines)
-
-
-@cmd("stop", "Stop a running stream process", master=True)
-async def command_stop(message, arguments):
-    if arguments:
-        number = utils.get_words(arguments)[0]
-    else:
-        number = 0
-    data = engines[number]
-    proc = data.get("proc")
-    data = await proc.stdout.read()
-    print(data.decode().strip())
-    proc.terminate()
-    return str(data)[:1950]
-
-
-@cmd("read", "Read process output", master=True)
-async def command_stop(message, arguments):
-    if arguments:
-        number = utils.get_words(arguments)[0]
-    else:
-        number = 0
-    data = engines[int(number)]
-    proc = data.get("proc")
-    data = await proc.stdout.read()
-    print(data.decode().strip())
-    return str(data.decode())[:1950]
-
-
-@cmd("count", "Get the count of streams", mod=True)
-async def command_count(**_):
-    return len(engines)
-
-
-@cmd("get_id", "Get the content_id for a stream", mod=True)
-async def get_id(message, arguments):
-    if arguments:
-        number = int(utils.get_words(arguments)[0])
-    else:
-        number = 0
-    if number < len(engines):
-        data = engines[int(number)]
-        num = data["number"]
-    else:
-        num = number
-    dir = config.get("publishdir", "/var/www/html/stream")
-    file = dir + "/live" + str(num) + ".acelive"
-    with open(file, "rb") as f:
-        filedata = base64.b64encode(f.read())
-
-    r = requests.post("http://api.torrentstream.net/upload/raw", data=filedata)
-    print(r)
-    return r.text
-
-
 @cmd("commands", "Get a list of commands")
 async def command_commands(message, arguments):
     cmds = []
@@ -184,6 +104,57 @@ async def command_commands(message, arguments):
         cmds.append(argument)
 
     return "`" + "`, `".join(cmds) + "`"
+
+
+@cmd("stream", "Start a stream")
+async def command_stream(message, arguments):
+    flags, parameter, text = utils.argument_parser(arguments)
+    text = utils.get_words(text)
+    print(text)
+    print(parameter)
+    str = stream.Stream(*text, **parameter)
+    streams.append(str)
+    data = await str.start()
+    return data
+
+
+@cmd("read", "Read console output for stream")
+async def command_read(message, arguments):
+    if not arguments:
+        number = 0
+    else:
+        number = int(arguments)
+
+    instance = streams[number]
+    return await instance.read()
+
+
+@cmd("stop", "Stop a stream")
+async def command_stop(message, arguments):
+    if not arguments:
+        number = 0
+    else:
+        number = int(arguments)
+
+    instance = streams[number]
+    return await instance.stop(True)
+
+
+@cmd("get_id", "Get the content_id for a stream", mod=True)
+async def get_id(message, arguments):
+    if not arguments:
+        number = 0
+    else:
+        number = int(arguments)
+
+    instance: stream.Stream = streams[number]
+    file = instance.file
+    with open(file, "rb") as f:
+        filedata = base64.b64encode(f.read())
+
+    r = requests.post("http://api.torrentstream.net/upload/raw", data=filedata)
+    print(r)
+    return r.json().get("content_id")
 
 
 client.run(open("token").read().strip())
